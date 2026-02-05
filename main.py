@@ -10,15 +10,25 @@ import fitz  # PyMuPDF for PDF text extraction and image conversion
 
 app = FastAPI(title="Invoice Data Extractor API")
 
-# Initialize xAI/Grok client (OpenAI-compatible)
-client = openai.OpenAI(
-    api_key=os.getenv("XAI_API_KEY"),
-    base_url="https://api.x.ai/v1"
-)
-
 # Models
 TEXT_MODEL = "grok-4-1-fast-reasoning"
 VISION_MODEL = "grok-2-vision-1212"
+
+# Lazy-loaded client
+_client = None
+
+def get_client():
+    """Get or create the xAI/Grok client (lazy initialization)."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("XAI_API_KEY")
+        if not api_key:
+            raise ValueError("XAI_API_KEY environment variable is not set")
+        _client = openai.OpenAI(
+            api_key=api_key,
+            base_url="https://api.x.ai/v1"
+        )
+    return _client
 
 
 class LineItem(BaseModel):
@@ -117,7 +127,7 @@ The document is in Hebrew. Here is the extracted text:
 Please extract:
 {EXTRACTION_INSTRUCTIONS}"""
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=TEXT_MODEL,
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}]
@@ -143,7 +153,7 @@ Please extract:
 {EXTRACTION_INSTRUCTIONS}"""
     })
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=VISION_MODEL,
         max_tokens=2000,
         messages=[{"role": "user", "content": content}]
